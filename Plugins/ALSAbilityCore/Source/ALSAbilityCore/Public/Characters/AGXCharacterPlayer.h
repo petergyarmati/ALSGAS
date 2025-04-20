@@ -3,9 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ActiveGameplayEffectHandle.h"
 #include "AGXCharacterBase.h"
 #include "AGXCharacterPlayer.generated.h"
 
+class UGameplayEffect;
 struct FInputActionValue;
 class UAlsCameraComponent;
 class UInputMappingContext;
@@ -81,6 +83,17 @@ public:
 	AAGXCharacterPlayer();
 
 	virtual void NotifyControllerChanged() override;
+	
+
+	virtual void PossessedBy(AController* NewController) override;
+
+	virtual void OnRep_PlayerState() override;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Stamina")
+	TSubclassOf<UGameplayEffect> StaminaDrainEffect;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Stamina")
+	TSubclassOf<UGameplayEffect> StaminaRegenEffect;
 
 	// Camera
 
@@ -92,6 +105,8 @@ protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* Input) override;
 
 private:
+	void InitAbilityActorInfo();
+	
 	void Input_OnLookMouse(const FInputActionValue& ActionValue);
 
 	void Input_OnLook(const FInputActionValue& ActionValue);
@@ -117,6 +132,9 @@ private:
 	void Input_OnViewMode();
 
 	void Input_OnSwitchShoulder();
+
+	FActiveGameplayEffectHandle ActiveStaminaDrainHandle;
+	FActiveGameplayEffectHandle ActiveStaminaRegenHandle;
 
 	// Debug
 

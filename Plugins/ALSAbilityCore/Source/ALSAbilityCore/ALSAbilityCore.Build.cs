@@ -27,7 +27,7 @@ public class ALSAbilityCore : ModuleRules
 			{
 				"Core",
 				// ... add other public dependencies that you statically link with here ...
-				"ALS",
+				"GameplayAbilities",
 			}
 			);
 			
@@ -40,10 +40,12 @@ public class ALSAbilityCore : ModuleRules
 				"Slate",
 				"SlateCore",
 				// ... add private dependencies that you statically link with here ...	
-				"GameplayAbilities",
 				"GameplayTags",
 				"GameplayTasks",
 				"EnhancedInput",
+				"ALS",
+				"ALSCamera",
+				"UMG",
 			}
 			);
 		

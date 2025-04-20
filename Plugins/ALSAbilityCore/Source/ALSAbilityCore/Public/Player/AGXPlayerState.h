@@ -4,14 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
-#include "ALS/Public/AlsCharacter.h"
-#include "AGXCharacterBase.generated.h"
+#include "GameFramework/PlayerState.h"
+#include "AGXPlayerState.generated.h"
 
 class UAttributeSet;
 class UAbilitySystemComponent;
-
+/**
+ * 
+ */
 UCLASS()
-class ALSABILITYCORE_API AAGXCharacterBase : public AAlsCharacter, public IAbilitySystemInterface
+class ALSABILITYCORE_API AAGXPlayerState : public APlayerState, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -21,11 +23,11 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UAttributeSet> AttributeSet;
-	
+
 public:
-	AAGXCharacterBase();
-	
+	AAGXPlayerState();
+
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	UAttributeSet* GetAttributeSet() const { return AttributeSet; };
+	UAttributeSet* GetAttributeSet() const { return AttributeSet; }
 };

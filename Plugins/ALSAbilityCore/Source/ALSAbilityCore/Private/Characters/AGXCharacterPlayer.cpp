@@ -3,11 +3,16 @@
 
 #include "Characters/AGXCharacterPlayer.h"
 
+#include "AbilitySystemComponent.h"
 #include "ALSCamera/Public/AlsCameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "AbilitySystem/AGXAttributeSet.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/AGXPlayerController.h"
+#include "Player/AGXPlayerState.h"
+#include "UI/HUD/AGXHUD.h"
 
 
 AAGXCharacterPlayer::AAGXCharacterPlayer()
@@ -48,6 +53,38 @@ void AAGXCharacterPlayer::NotifyControllerChanged()
 	}
 
 	Super::NotifyControllerChanged();
+}
+
+void AAGXCharacterPlayer::InitAbilityActorInfo()
+{
+	if (AAGXPlayerState* AGXPlayerState = GetPlayerState<AAGXPlayerState>())
+	{
+		AGXPlayerState->GetAbilitySystemComponent()->InitAbilityActorInfo(AGXPlayerState, this);
+		AbilitySystemComponent = AGXPlayerState->GetAbilitySystemComponent();
+		AttributeSet = AGXPlayerState->GetAttributeSet();
+
+		if (AAGXPlayerController* AGXPlayerController = Cast<AAGXPlayerController>(GetController()))
+		{
+			if (AAGXHUD* AGXHUD = Cast<AAGXHUD>(AGXPlayerController->GetHUD()))
+				AGXHUD->InitOverlay(AGXPlayerController, AGXPlayerState, AbilitySystemComponent, AttributeSet);
+		}
+	}
+}
+
+void AAGXCharacterPlayer::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	// Init ability actor info for the Server
+	InitAbilityActorInfo();
+}
+
+void AAGXCharacterPlayer::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	// Init ability actor info for the Client
+	InitAbilityActorInfo();
 }
 
 void AAGXCharacterPlayer::CalcCamera(float DeltaTime, FMinimalViewInfo& ViewInfo)
@@ -112,7 +149,62 @@ void AAGXCharacterPlayer::Input_OnMove(const FInputActionValue& ActionValue)
 
 void AAGXCharacterPlayer::Input_OnSprint(const FInputActionValue& ActionValue)
 {
-	SetDesiredGait(ActionValue.Get<bool>() ? AlsGaitTags::Sprinting : AlsGaitTags::Running);
+	//SetDesiredGait(ActionValue.Get<bool>() ? AlsGaitTags::Sprinting : AlsGaitTags::Running);
+	const bool bWantsToSprint = ActionValue.Get<bool>();
+	// Block sprinting if not enough stamina
+	if (bWantsToSprint && AttributeSet && Cast<UAGXAttributeSet>(AttributeSet)->GetStamina() <= 10.0f)
+	{
+		// Optional: play a denied sound or HUD feedback
+		return;
+	}
+	SetDesiredGait(bWantsToSprint ? AlsGaitTags::Sprinting : AlsGaitTags::Running);
+
+	if (AbilitySystemComponent)
+	{
+		if (bWantsToSprint)
+		{
+			// Apply Stamina Drain
+			if (StaminaDrainEffect && !ActiveStaminaDrainHandle.IsValid())
+			{
+				FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();
+				FGameplayEffectSpecHandle Spec = AbilitySystemComponent->MakeOutgoingSpec(StaminaDrainEffect, 1.0f, Context);
+				if (Spec.IsValid())
+				{
+					ActiveStaminaDrainHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+				}
+			}
+
+			// Remove Regen if sprinting
+			if (ActiveStaminaRegenHandle.IsValid())
+			{
+				AbilitySystemComponent->RemoveActiveGameplayEffect(ActiveStaminaRegenHandle);
+				ActiveStaminaRegenHandle.Invalidate();
+			}
+		}
+		else
+		{
+			// Remove Stamina Drain
+			if (ActiveStaminaDrainHandle.IsValid())
+			{
+				AbilitySystemComponent->RemoveActiveGameplayEffect(ActiveStaminaDrainHandle);
+				ActiveStaminaDrainHandle.Invalidate();
+			}
+
+			// Delay regen (optional)
+			GetWorld()->GetTimerManager().SetTimerForNextTick([this]()
+			{
+				if (StaminaRegenEffect && !ActiveStaminaRegenHandle.IsValid())
+				{
+					FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();
+					FGameplayEffectSpecHandle Spec = AbilitySystemComponent->MakeOutgoingSpec(StaminaRegenEffect, 1.0f, Context);
+					if (Spec.IsValid())
+					{
+						ActiveStaminaRegenHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+					}
+				}
+			});
+		}
+	}
 }
 
 void AAGXCharacterPlayer::Input_OnWalk()
